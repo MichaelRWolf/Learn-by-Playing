@@ -1,0 +1,138 @@
+a#! /bin/bash
+set -euo pipefail
+
+# Configurations
+ENV_ROOT="$HOME/.venvs"
+PROJECT_NAME="triangle_worksheet"
+PROJECTS_DIR="$HOME/projects"
+PROJECT_DIR="$PROJECTS_DIR/$PROJECT_NAME"
+VENV_DIR="$ENV_ROOT/$PROJECT_NAME"
+REQUIREMENTS_FILE="$PROJECT_DIR/requirements.txt"
+PYTHON_FILE="$PROJECT_DIR/src/triangle_solver.py"
+
+# Create the virtual environment root directory if it doesn't exist
+mkdir -p "$ENV_ROOT"
+mkdir -p "$PROJECTS_DIR"
+
+# Create and activate the virtual environment
+if [ ! -d "$VENV_DIR" ]; then
+    python3 -m venv "$VENV_DIR"
+    echo "Created virtual environment at $VENV_DIR"
+else
+    echo "Virtual environment already exists at $VENV_DIR"
+fi
+
+# Create the project directory
+if [ ! -d "$PROJECT_DIR" ]; then
+    mkdir -p "$PROJECT_DIR/src"
+    mkdir -p "$PROJECT_DIR/tests"
+    touch "$PROJECT_DIR/README.md"
+    echo "# $PROJECT_NAME" > "$PROJECT_DIR/README.md"
+    echo "Created project structure at $PROJECT_DIR"
+else
+    echo "Project directory already exists at $PROJECT_DIR"
+fi
+
+# Create triangle_solver.py
+cat > "$PYTHON_FILE" << 'EOF'
+import random
+import json
+import math
+
+def generate_random_angle(min_degrees, max_degrees, round_to_degrees):
+    return round(random.uniform(min_degrees, max_degrees), round_to_degrees)
+
+def law_of_cosines_for_side(a, b, C):
+    return math.sqrt(a**2 + b**2 - 2 * a * b * math.cos(math.radians(C)))
+
+def law_of_cosines_for_angle(a, b, c):
+    return math.degrees(math.acos((a**2 + b**2 - c**2) / (2 * a * b)))
+
+def law_of_sines_for_side(a, A, B):
+    return a * math.sin(math.radians(B)) / math.sin(math.radians(A))
+
+def law_of_sines_for_angle(a, A, b):
+    return math.degrees(math.asin(b * math.sin(math.radians(A)) / a))
+
+def generate_triangle():
+    triangle_types = ["SSS", "SSA", "SAS", "ASA", "AAS", "AAA"]
+    triangle_type = random.choice(triangle_types)
+    knowns = {}
+    
+    if triangle_type == "SSS":
+        a, b, c = sorted([random.uniform(5, 20) for _ in range(3)])
+        knowns = {"a": a, "b": b, "c": c}
+    elif triangle_type == "SSA":
+        a = random.uniform(5, 20)
+        b = random.uniform(5, 20)
+        A = generate_random_angle(10, 80, 2)
+        knowns = {"a": a, "b": b, "A": A}
+    elif triangle_type == "SAS":
+        a = random.uniform(5, 20)
+        b = random.uniform(5, 20)
+        C = generate_random_angle(20, 140, 2)
+        knowns = {"a": a, "b": b, "C": C}
+    elif triangle_type == "ASA":
+        A = generate_random_angle(20, 80, 2)
+        B = generate_random_angle(20, 80, 2)
+        c = random.uniform(5, 20)
+        knowns = {"A": A, "B": B, "c": c}
+    elif triangle_type == "AAS":
+        A = generate_random_angle(10, 80, 2)
+        B = generate_random_angle(10, 80, 2)
+        a = random.uniform(5, 20)
+        knowns = {"A": A, "B": B, "a": a}
+    elif triangle_type == "AAA":
+        A = generate_random_angle(30, 60, 2)
+        B = generate_random_angle(30, 60, 2)
+        C = 180 - (A + B)
+        knowns = {"A": A, "B": B, "C": C}
+    
+    return {"type": triangle_type, "knowns": knowns, "solved": {}}
+
+def solve_triangle(triangle_data):
+    knowns = triangle_data["knowns"]
+    solved = {}
+    
+    if triangle_data["type"] == "SSS":
+        a, b, c = knowns["a"], knowns["b"], knowns["c"]
+        A = law_of_cosines_for_angle(b, c, a)
+        B = law_of_cosines_for_angle(a, c, b)
+        C = 180 - (A + B)
+        solved = {"A": A, "B": B, "C": C}
+    elif triangle_data["type"] == "SSA":
+        a, b, A = knowns["a"], knowns["b"], knowns["A"]
+        B = law_of_sines_for_angle(a, A, b)
+        C = 180 - (A + B)
+        c = law_of_sines_for_side(a, A, C)
+        solved = {"B": B, "C": C, "c": c}
+    elif triangle_data["type"] == "SAS":
+        a, b, C = knowns["a"], knowns["b"], knowns["C"]
+        c = law_of_cosines_for_side(a, b, C)
+        A = law_of_cosines_for_angle(b, c, a)
+        B = 180 - (A + C)
+        solved = {"A": A, "B": B, "c": c}
+    elif triangle_data["type"] == "ASA":
+        A, B, c = knowns["A"], knowns["B"], knowns["c"]
+        C = 180 - (A + B)
+        a = law_of_sines_for_side(c, C, A)
+        b = law_of_sines_for_side(c, C, B)
+        solved = {"C": C, "a": a, "b": b}
+    elif triangle_data["type"] == "AAS":
+        A, B, a = knowns["A"], knowns["B"], knowns["a"]
+        C = 180 - (A + B)
+        b = law_of_sines_for_side(a, A, B)
+        c = law_of_sines_for_side(a, A, C)
+        solved = {"C": C, "b": b, "c": c}
+    elif triangle_data["type"] == "AAA":
+        solved = {"Note": "AAA cannot determine side lengths."}
+    
+    triangle_data["solved"] = solved
+    return triangle_data
+EOF
+
+echo "Created triangle_solver.py at $PYTHON_FILE"
+
+# Setup complete
+echo "Setup complete! To activate the environment, run:"
+echo "source $VENV_DIR/bin/activate"
